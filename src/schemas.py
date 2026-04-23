@@ -34,3 +34,14 @@ class UserCreate(BaseModel):
         if self.password != self.confirm_password:
             raise ValueError("Passwords do not match")
         return self
+
+class User(BaseModel):
+    id: int
+    username: str
+    role: str  # 'user' | 'admin'
+
+class File(BaseModel):
+    id: int
+    filename: str
+    size: int
+    owner_id: int
