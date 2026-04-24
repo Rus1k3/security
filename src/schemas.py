@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 import re
+from typing import Optional
 
 class UserCreate(BaseModel):
     username: str = Field(
@@ -42,6 +43,7 @@ class User(BaseModel):
 
 class File(BaseModel):
     id: int
-    filename: str
+    original_name: str
+    path: str
     size: int
     owner_id: int
