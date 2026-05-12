@@ -161,11 +161,24 @@ async def upload_file(
         raise HTTPException(status_code=413, detail="File too large")
 
     kind = filetype.guess(content)
-    if kind is None or kind.mime not in ["image/jpeg", "image/png"]:
-        raise HTTPException(status_code=400, detail="Invalid file type")
+
+    allowed_mimes = [
+        "image/jpeg",
+        "image/png",
+        "text/plain"
+    ]
+
+    # TXT файлы filetype может не определить
+    if kind is not None:
+        if kind.mime not in allowed_mimes:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid file type"
+            )
 
     file_id = len(files_db) + 1
-    filename = f"{uuid.uuid4()}.{kind.extension}"
+    extension = file.filename.split(".")[-1]
+    filename = f"{uuid.uuid4()}.{extension}"
     path = os.path.join(UPLOAD_DIR, filename)
 
     if encrypt:
