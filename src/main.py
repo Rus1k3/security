@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 import bleach
+from dotenv import load_dotenv
 from fastapi import Response
 from fastapi import Depends, HTTPException, Path
 from schemas import User, File
@@ -10,13 +11,18 @@ import uuid
 import filetype
 from fastapi import UploadFile, File as FastAPIFile, HTTPException
 from fastapi.responses import FileResponse
+from cryptography.fernet import Fernet
 
+load_dotenv()
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 comments = []
 MAX_FILE_SIZE = 2 * 1024 * 1024
 UPLOAD_DIR = "storage"
+
+FERNET_KEY = os.getenv("FERNET_KEY")
+cipher = Fernet(FERNET_KEY)
 
 users_db = [
     User(id=1, username="alice", role="user"),
@@ -146,6 +152,7 @@ def all_files(current_user: User = Depends(get_current_user)):
 @app.post("/files/upload")
 async def upload_file(
     file: UploadFile = FastAPIFile(...),
+    encrypt: bool = False,
     current_user: User = Depends(get_current_user)
 ):
     content = await file.read()
@@ -161,6 +168,9 @@ async def upload_file(
     filename = f"{uuid.uuid4()}.{kind.extension}"
     path = os.path.join(UPLOAD_DIR, filename)
 
+    if encrypt:
+        content = cipher.encrypt(content)
+
     with open(path, "wb") as f:
         f.write(content)
 
@@ -169,7 +179,8 @@ async def upload_file(
         original_name=file.filename,
         path=path,
         size=len(content),
-        owner_id=current_user.id
+        owner_id=current_user.id,
+        is_encrypted=encrypt
     )
 
     files_db.append(new_file)
@@ -179,8 +190,36 @@ async def upload_file(
 
 @app.get("/files/{file_id}/download")
 def download_file(file=Depends(check_file_permissions)):
+
     if not os.path.exists(file.path):
         raise HTTPException(status_code=404, detail="File not found")
+
+    # Обычный файл
+    if not file.is_encrypted:
+        return FileResponse(
+            path=file.path,
+            filename=file.original_name,
+            media_type="application/octet-stream",
+            headers={
+                "Content-Disposition":
+                f'attachment; filename="{file.original_name}"'
+            }
+        )
+
+    # Зашифрованный файл
+    with open(file.path, "rb") as f:
+        encrypted_data = f.read()
+
+    decrypted_data = cipher.decrypt(encrypted_data)
+
+    return Response(
+        content=decrypted_data,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition":
+            f'attachment; filename="{file.original_name}"'
+        }
+    )
 
     return FileResponse(
         path=file.path,

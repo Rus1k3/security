@@ -47,3 +47,4 @@ class File(BaseModel):
     path: str
     size: int
     owner_id: int
+    is_encrypted: bool = False
