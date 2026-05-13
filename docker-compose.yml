@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    container_name: security_app
+
+    ports:
+      - "8000:8000"
+
+    volumes:
+      - ./src/storage:/app/src/storage
+
+    env_file:
+      - .env
+
+    restart: unless-stopped

@@ -5,7 +5,7 @@ import bleach
 from dotenv import load_dotenv
 from fastapi import Response
 from fastapi import Depends, HTTPException, Path
-from schemas import User, File
+from src.schemas import User, File
 import os
 import uuid
 import filetype
@@ -19,7 +19,7 @@ app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 comments = []
 MAX_FILE_SIZE = 2 * 1024 * 1024
-UPLOAD_DIR = "storage"
+UPLOAD_DIR = "src/storage"
 
 FERNET_KEY = os.getenv("FERNET_KEY")
 cipher = Fernet(FERNET_KEY)
