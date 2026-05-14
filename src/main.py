@@ -12,6 +12,9 @@ import filetype
 from fastapi import UploadFile, File as FastAPIFile, HTTPException
 from fastapi.responses import FileResponse
 from cryptography.fernet import Fernet
+import logging
+import traceback
+from fastapi.responses import JSONResponse
 
 load_dotenv()
 
@@ -20,6 +23,19 @@ templates = Jinja2Templates(directory="templates")
 comments = []
 MAX_FILE_SIZE = 2 * 1024 * 1024
 UPLOAD_DIR = "src/storage"
+
+os.makedirs("src/logs", exist_ok=True)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s",
+    handlers=[
+        logging.FileHandler("src/logs/app.log"),
+        logging.StreamHandler()
+    ]
+)
+
+logger = logging.getLogger(__name__)
 
 FERNET_KEY = os.getenv("FERNET_KEY")
 cipher = Fernet(FERNET_KEY)
@@ -95,11 +111,27 @@ async def add_csp_header(request: Request, call_next):
     )
     return response
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+
+    logger.error(
+        f"Unhandled error: {str(exc)}\n{traceback.format_exc()}"
+    )
+
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "We are sorry, something went wrong."
+        }
+    )
 
 def get_current_user(user_id: int) -> User:
     for user in users_db:
         if user.id == user_id:
             return user
+        logger.warning(
+    f"Unauthorized access attempt with user_id={user_id}"
+)
     raise HTTPException(status_code=401, detail="Unauthorized")
 
 
@@ -197,7 +229,10 @@ async def upload_file(
     )
 
     files_db.append(new_file)
-
+    logger.info(
+    f"User {current_user.username} uploaded file {file.filename}"
+)
+    
     return {"message": "File uploaded", "file_id": file_id}
 
 
@@ -205,6 +240,9 @@ async def upload_file(
 def download_file(file=Depends(check_file_permissions)):
 
     if not os.path.exists(file.path):
+        logger.warning(
+        f"User {current_user.username} tried to access чужой file {file.id}"
+    )
         raise HTTPException(status_code=404, detail="File not found")
 
     # Обычный файл
@@ -242,3 +280,7 @@ def download_file(file=Depends(check_file_permissions)):
             "Content-Disposition": f'attachment; filename="{file.original_name}"'
         }
     )
+
+@app.get("/cause_error")
+def cause_error():
+    return 1 / 0
